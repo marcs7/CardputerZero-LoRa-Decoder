@@ -1,6 +1,6 @@
 {
   "app_name": "LoRa Decoder",
-  "package_name": "lora_decoder",
+  "package_name": "loradecoder",
   "version": "0.1.0",
   "description": "LoRa frequency scanner and packet decoder for CardputerZero (SX1262)",
 
