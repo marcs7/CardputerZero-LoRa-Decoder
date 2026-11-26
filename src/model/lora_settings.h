@@ -22,6 +22,8 @@ struct LoraSettings {
     uint32_t hunt_dwell_ms{0};       // 0 = CAD hopping
     uint32_t spectrum_step_hz{50000};
     uint32_t listen_step_hz{25000};
+    bool capture{false};          // write received packets to a PCAP file
+    bool waterfall{false};        // Scan page shows the waterfall instead of the trace
     decoder::LoraModem listen{default_listen_modem()};
 
     static decoder::LoraModem default_listen_modem() {

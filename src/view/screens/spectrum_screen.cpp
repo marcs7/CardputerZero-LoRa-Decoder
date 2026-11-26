@@ -23,6 +23,28 @@ constexpr int32_t kChartH = 78;
 constexpr int32_t kDbMin = -130;
 constexpr int32_t kDbMax = -40;
 
+// Waterfall palette: noise floor dark blue -> cyan -> green -> yellow -> red.
+lv_color_t heat_color(float dbm) {
+    struct Stop { float t; uint8_t r, g, b; };
+    static constexpr Stop kStops[] = {
+        {0.00f, 0, 0, 24}, {0.25f, 0, 40, 160}, {0.45f, 0, 170, 210},
+        {0.62f, 40, 210, 60}, {0.80f, 250, 220, 0}, {1.00f, 255, 40, 20},
+    };
+    float t = (dbm + 125.0f) / 65.0f;  // -125 .. -60 dBm
+    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+    for (std::size_t i = 1; i < sizeof(kStops) / sizeof(kStops[0]); ++i) {
+        if (t <= kStops[i].t) {
+            const auto& a = kStops[i - 1];
+            const auto& b = kStops[i];
+            const float k = (t - a.t) / (b.t - a.t);
+            return lv_color_make(static_cast<uint8_t>(a.r + (b.r - a.r) * k),
+                                 static_cast<uint8_t>(a.g + (b.g - a.g) * k),
+                                 static_cast<uint8_t>(a.b + (b.b - a.b) * k));
+        }
+    }
+    return lv_color_make(255, 40, 20);
+}
+
 } // namespace
 
 SpectrumScreen::SpectrumScreen(viewmodel::BaseViewModel& view_model, app::AssetManager& assets)
@@ -68,6 +90,13 @@ void SpectrumScreen::build_content(lv_obj_t* content) {
     const auto colors = view::palette(vm.is_dark_mode());
     peak_series_ = lv_chart_add_series(chart_, colors.warning, LV_CHART_AXIS_PRIMARY_Y);
     live_series_ = lv_chart_add_series(chart_, colors.primary, LV_CHART_AXIS_PRIMARY_Y);
+
+    // Waterfall canvas, same frame as the chart (newest sweep at the top).
+    waterfall_buf_.resize(LV_CANVAS_BUF_SIZE(kChartW, kChartH, 16, LV_DRAW_BUF_STRIDE_ALIGN));
+    waterfall_ = lv_canvas_create(content);
+    lv_canvas_set_buffer(waterfall_, waterfall_buf_.data(), kChartW, kChartH, LV_COLOR_FORMAT_RGB565);
+    lv_canvas_fill_bg(waterfall_, lv_color_make(0, 0, 24), LV_OPA_COVER);
+    lv_obj_set_pos(waterfall_, kChartX, kChartY);
 
     cursor_ = lv_obj_create(content);
     lv_obj_remove_style_all(cursor_);
@@ -135,6 +164,16 @@ void SpectrumScreen::refresh() {
     lv_label_set_text_fmt(range_label_, "%s-%s MHz", decoder::format_mhz(cfg.start_hz).c_str(),
                           decoder::format_mhz(cfg.end_hz).c_str());
 
+    const bool waterfall = vm.settings().waterfall;
+    if (waterfall) {
+        lv_obj_add_flag(chart_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(waterfall_, LV_OBJ_FLAG_HIDDEN);
+        draw_waterfall();
+    } else {
+        lv_obj_remove_flag(chart_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(waterfall_, LV_OBJ_FLAG_HIDDEN);
+    }
+
     if (sp.live.empty()) {
         lv_obj_remove_flag(waiting_label_, LV_OBJ_FLAG_HIDDEN);
         lv_label_set_text(waiting_label_, status.error.empty() ? "sweeping..." : status.error.c_str());
@@ -182,6 +221,31 @@ void SpectrumScreen::refresh() {
     place_cursor();
 }
 
+void SpectrumScreen::draw_waterfall() {
+    const auto& history = view_model().spectrum().history;
+    lv_draw_buf_t* buf = lv_canvas_get_draw_buf(waterfall_);
+    if (!buf) {
+        return;
+    }
+    const uint32_t stride = buf->header.stride;
+    auto* base = static_cast<uint8_t*>(buf->data);
+    const uint16_t floor_px = lv_color_to_u16(lv_color_make(0, 0, 24));
+    for (int32_t y = 0; y < kChartH; ++y) {
+        auto* row = reinterpret_cast<uint16_t*>(base + static_cast<std::size_t>(y) * stride);
+        if (static_cast<std::size_t>(y) >= history.size() || history[static_cast<std::size_t>(y)].size() < 2) {
+            for (int32_t x = 0; x < kChartW; ++x) row[x] = floor_px;
+            continue;
+        }
+        const auto& sweep = history[static_cast<std::size_t>(y)];
+        const auto n = static_cast<int32_t>(sweep.size());
+        for (int32_t x = 0; x < kChartW; ++x) {
+            const int32_t bin = x * (n - 1) / (kChartW - 1);
+            row[x] = lv_color_to_u16(heat_color(sweep[static_cast<std::size_t>(bin)]));
+        }
+    }
+    lv_obj_invalidate(waterfall_);
+}
+
 bool SpectrumScreen::handle_key(uint32_t key, bool long_pressed) {
     auto& vm = view_model();
     const auto& sp = vm.spectrum();
@@ -211,6 +275,10 @@ bool SpectrumScreen::handle_key(uint32_t key, bool long_pressed) {
         case 'p':
         case 'P':
             vm.reset_spectrum_peaks();
+            return true;
+        case 'w':
+        case 'W':
+            if (!long_pressed) vm.toggle_waterfall();
             return true;
         default:
             return false;

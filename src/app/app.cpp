@@ -118,6 +118,17 @@ std::string writable_config_path() {
 #endif
 }
 
+// PCAP captures: $XDG_DATA_HOME/lora-decoder/captures or ~/.local/share/lora-decoder/captures
+std::string capture_directory() {
+    if (const char* xdg = std::getenv("XDG_DATA_HOME"); xdg && xdg[0] == '/') {
+        return (std::filesystem::path(xdg) / "lora-decoder" / "captures").string();
+    }
+    if (const char* home = std::getenv("HOME"); home && home[0] == '/') {
+        return (std::filesystem::path(home) / ".local" / "share" / "lora-decoder" / "captures").string();
+    }
+    return "/tmp/lora-decoder-captures";
+}
+
 void persist_dark_mode_observer(lv_observer_t* observer, lv_subject_t* subject) {
     auto* persistence = static_cast<ConfigPersistence*>(lv_observer_get_user_data(observer));
     if (!persistence) {
@@ -348,6 +359,7 @@ int Application::run() {
     } else {
         LOG_ERROR("radio backend '{}' failed: {}", backend, radio_error);
     }
+    view_model.set_capture_directory(capture_directory());
     view_model.apply_settings(config.lora);
     view_model.attach_radio(&radio);
 

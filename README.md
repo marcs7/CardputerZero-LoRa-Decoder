@@ -9,18 +9,19 @@ no libgpiod dependency.
 
 | Page (key) | What it does |
 | --- | --- |
-| **Scan** (`4`) | RSSI sweep of the band with live trace, peak hold, cursor readout and zoom (full, 2 MHz, 500 kHz) |
+| **Scan** (`4`) | RSSI sweep of the band: live trace with peak hold, or a scrolling **waterfall** (about 20 s of history), cursor readout and zoom (full, 2 MHz, 500 kHz) |
 | **Hunt** (`5`) | Hops LoRaWAN channels and Meshtastic preset slots. On each hop it runs Channel Activity Detection (CAD) for every SF, then receives and decodes whatever it catches |
 | **RX** (`6`) | Continuous receive on one channel, with frequency, SF, BW, CR, sync word and IQ all adjustable |
 | **Log** (`7`) | Packet log with a decoded detail view and a hex dump |
-| **Cfg** (`8`) | Band plan, scan profile, hunt mode, spectrum step, theme and radio status |
+| **Cfg** (`8`) | Band plan, scan profile, hunt mode, spectrum step, scan view, **PCAP capture**, theme and radio status |
 
 ### Decoding
 
 - **Meshtastic**: reads the 16-byte header (from, to, id, hops, channel hash, relay). It
   decrypts the payload with AES-CTR using the default `AQ==` key on every modem-preset channel
   name, plus any channels you add in the config. Decoded port types: text, position, node info,
-  telemetry (device and environment), traceroute and routing. Other ports are shown as hex.
+  telemetry (device, environment, power), traceroute, routing, waypoint, neighbor info, map report,
+  range test and paxcounter. Other ports are shown as hex.
 - **LoRaWAN**: shows the MHDR type; for join requests, the JoinEUI, DevEUI and DevNonce; for
   data frames, the DevAddr with its NetID / NwkID (TTN is recognised), FCtrl flags, FCnt, FOpts,
   FPort and MIC. The FRMPayload stays encrypted because session keys are not available.
@@ -88,7 +89,7 @@ radio is never put into TX.
 | Context | Keys |
 | --- | --- |
 | Everywhere | `4`–`8` jump to a page · `ESC` then `←/→` move along the tab bar (`Enter`/`↓`/`ESC` back to the page) · `Tab` next page · hold `ESC` to exit · `Fn+H` help · `Fn+J` screenshot |
-| Scan | `←/→` move the cursor · `↑/↓` zoom · `Enter` listen at the cursor · `P` reset peaks |
+| Scan | `←/→` move the cursor · `↑/↓` zoom · `Enter` listen at the cursor · `P` reset peaks · `W` trace or waterfall |
 | Hunt | `←/→` change profile · `↑/↓` change band · `D` CAD or dwell mode · `Enter` open the log |
 | RX | `←/→` tune · `↑/↓` change SF · `B` bandwidth · `R` coding rate · `S` tuning step · `W` sync word · `I` invert IQ · `M` next Meshtastic preset |
 | Log | `↑/↓` select or scroll · `Enter` open or close the detail view · `L` listen on that packet's channel · `E` clear |
@@ -96,6 +97,15 @@ radio is never put into TX.
 
 Arrows: inside the app the keys `F` (↑), `X` (↓), `Z` (←) and `C` (→) work as arrows
 without Fn, matching the arrows printed on the CardputerZero keyboard. `Fn+F/X/Z/C` works too.
+
+## Packet capture (PCAP)
+
+Set **Cfg → Capture PCAP** to On to log every received packet, including those with CRC errors,
+to `~/.local/share/lora-decoder/captures/lora_<date>_<time>.pcap`. On the device that is
+`/home/pi/.local/share/lora-decoder/captures/`. The file uses the LoRaTAP link type (DLT 270), so
+Wireshark shows frequency, SF, bandwidth, RSSI, SNR and sync word for each frame. Every record is
+flushed to disk immediately, so a capture survives a power loss. Copy the files off with
+`adb pull` or `scp`.
 
 ## Configuration (`config/lora-decoder.conf`)
 

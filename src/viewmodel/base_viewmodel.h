@@ -9,6 +9,7 @@
 
 #include "subjects.h"
 #include "base_model.h"
+#include "pcap_writer.h"
 #include "radio/radio_service.h"
 
 #include "lvgl.h"
@@ -27,6 +28,9 @@ struct SpectrumView {
     std::vector<float> peak;
     uint32_t sweep_ms{0};
     uint32_t sweeps{0};
+    // Newest sweep first; reset whenever the sweep layout changes.
+    std::deque<std::vector<float>> history;
+    static constexpr std::size_t kHistoryRows = 78;
 };
 
 class BaseViewModel {
@@ -94,6 +98,15 @@ public:
     void cycle_listen_cr(int delta);
     void cycle_listen_sync(int delta);
     void toggle_listen_iq();
+    void toggle_waterfall();
+
+    // ---- PCAP capture (LoRaTAP) ----
+    void set_capture_directory(std::string directory);
+    void toggle_capture();
+    bool capture_active() const { return pcap_.is_open(); }
+    const std::string& capture_path() const { return pcap_.path(); }
+    uint32_t capture_count() const { return pcap_.count(); }
+    const std::string& capture_error() const { return capture_error_; }
     void apply_settings(const model::LoraSettings& settings);  // from config, no save
 
     std::vector<decoder::ScanTarget> current_targets() const;
@@ -130,6 +143,10 @@ private:
     int spectrum_zoom_{0};  // 0 = full band, 1 = 2 MHz, 2 = 500 kHz
     uint32_t spectrum_center_hz_{0};
     std::function<void()> settings_listener_;
+    void start_capture();
+    std::string capture_directory_;
+    decoder::PcapWriter pcap_;
+    std::string capture_error_;
 };
 
 } // namespace viewmodel

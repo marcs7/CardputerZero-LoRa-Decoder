@@ -96,6 +96,8 @@ bool apply_key(ApplicationConfig& c, const std::string& section, const std::stri
         if (key == "listen_preamble") return parse_uint(value, l.listen.preamble, 6, 65535);
         if (key == "listen_iq_inverted") return parse_bool(value, l.listen.iq_inverted);
         if (key == "listen_crc") return parse_bool(value, l.listen.crc_on);
+        if (key == "capture") return parse_bool(value, l.capture);
+        if (key == "waterfall") return parse_bool(value, l.waterfall);
         return true;
     }
     if (section == "radio") {
@@ -194,7 +196,9 @@ bool save_application_config(const std::string& path, const ApplicationConfig& c
           {"listen_sync", sync},
           {"listen_preamble", std::to_string(l.listen.preamble)},
           {"listen_iq_inverted", l.listen.iq_inverted ? "yes" : "no"},
-          {"listen_crc", l.listen.crc_on ? "yes" : "no"}}},
+          {"listen_crc", l.listen.crc_on ? "yes" : "no"},
+          {"capture", l.capture ? "yes" : "no"},
+          {"waterfall", l.waterfall ? "yes" : "no"}}},
     };
 
     // Keep everything outside the managed sections untouched.

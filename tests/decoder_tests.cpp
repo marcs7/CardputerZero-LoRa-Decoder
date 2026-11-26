@@ -12,10 +12,13 @@
 #include "lorawan.h"
 #include "meshtastic.h"
 #include "packet_decoder.h"
+#include "pcap_writer.h"
 #include "protobuf_reader.h"
 
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -208,12 +211,114 @@ static void test_raw_text_and_plans() {
     CHECK(looks_like_protobuf(reinterpret_cast<const uint8_t*>("\x08\x01"), 2));
 }
 
+static std::vector<uint8_t> pb_field_bytes(uint32_t field, const std::vector<uint8_t>& b) {
+    std::vector<uint8_t> out = {static_cast<uint8_t>((field << 3) | 2), static_cast<uint8_t>(b.size())};
+    out.insert(out.end(), b.begin(), b.end());
+    return out;
+}
+
+static std::vector<uint8_t> pb_fixed32(uint32_t field, uint32_t v) {
+    std::vector<uint8_t> out = {static_cast<uint8_t>((field << 3) | 5)};
+    for (int i = 0; i < 4; ++i) out.push_back(static_cast<uint8_t>(v >> (8 * i)));
+    return out;
+}
+
+static std::vector<uint8_t> data_msg(uint8_t port, const std::vector<uint8_t>& payload) {
+    std::vector<uint8_t> pb = {0x08, port};
+    auto f = pb_field_bytes(2, payload);
+    pb.insert(pb.end(), f.begin(), f.end());
+    return pb;
+}
+
+static void test_more_meshtastic() {
+    DecodeContext ctx;
+    ctx.sync_word = meshtastic::kSyncWord;
+
+    // WAYPOINT: name "Rifugio", lat/lon
+    std::vector<uint8_t> wp = {0x08, 0x07};
+    auto lat = pb_fixed32(2, 454642040), lon = pb_fixed32(3, 91899820);
+    wp.insert(wp.end(), lat.begin(), lat.end());
+    wp.insert(wp.end(), lon.begin(), lon.end());
+    auto nm = pb_field_bytes(6, std::vector<uint8_t>({'R', 'i', 'f', 'u', 'g', 'i', 'o'}));
+    wp.insert(wp.end(), nm.begin(), nm.end());
+    auto pkt = build_meshtastic_packet(0x11223344, 0xffffffff, 9, data_msg(8, wp), "LongFast");
+    auto p = decode_packet(pkt.data(), pkt.size(), ctx);
+    CHECK(field(p, "Name") == "Rifugio");
+    CHECK(field(p, "Position") == "45.46420,9.18998");
+    CHECK(p.summary == "!11223344 waypoint Rifugio");
+
+    // NEIGHBORINFO: node 0xa1b2c3d4, one neighbor 0x01020304 snr 6.5
+    std::vector<uint8_t> nb = {0x08, 0xd4, 0x87, 0xcb, 0x8d, 0x0a};  // varint 0xa1b2c3d4
+    std::vector<uint8_t> neigh = {0x08, 0x84, 0x86, 0x88, 0x08};    // varint 0x01020304
+    float snr = 6.5f;
+    uint32_t bits;
+    std::memcpy(&bits, &snr, 4);
+    auto s1 = pb_fixed32(2, bits);
+    neigh.insert(neigh.end(), s1.begin(), s1.end());
+    auto nf = pb_field_bytes(4, neigh);
+    nb.insert(nb.end(), nf.begin(), nf.end());
+    pkt = build_meshtastic_packet(0xa1b2c3d4, 0xffffffff, 10, data_msg(71, nb), "LongFast");
+    p = decode_packet(pkt.data(), pkt.size(), ctx);
+    CHECK(field(p, "Node") == "!a1b2c3d4");
+    CHECK(field(p, "Neighbor") == "!01020304  SNR 6.5");
+    CHECK(p.summary == "!a1b2c3d4 neighbors 1");
+
+    // MAP_REPORT: short name + firmware
+    std::vector<uint8_t> mr = pb_field_bytes(2, std::vector<uint8_t>({'M', 'I', 'B'}));
+    auto fw = pb_field_bytes(5, std::vector<uint8_t>({'2', '.', '6'}));
+    mr.insert(mr.end(), fw.begin(), fw.end());
+    pkt = build_meshtastic_packet(0x55667788, 0xffffffff, 11, data_msg(73, mr), "LongFast");
+    p = decode_packet(pkt.data(), pkt.size(), ctx);
+    CHECK(field(p, "Firmware") == "2.6");
+    CHECK(p.summary == "!55667788 map report MIB");
+
+    // LongTurbo exists and fits US (500 kHz slots) but not EU_868 (250 kHz wide region)
+    const meshtastic::ModemPreset* lt = nullptr;
+    for (const auto& pr : meshtastic::modem_presets()) if (std::string(pr.name) == "LongTurbo") lt = &pr;
+    CHECK(lt && lt->bandwidth_hz == 500000 && lt->spreading_factor == 11 && lt->coding_rate == 8);
+    const uint32_t f_us = meshtastic::default_frequency_hz(*meshtastic::find_region("US"), *lt, "LongTurbo");
+    CHECK(f_us > 902000000 && f_us < 928000000);
+    CHECK(meshtastic::default_frequency_hz(*meshtastic::find_region("EU_868"), *lt, "LongTurbo") == 0);
+}
+
+static void test_pcap() {
+    LoraModem m;
+    m.freq_hz = 869525000;
+    m.bandwidth_hz = 250000;
+    m.spreading_factor = 11;
+    m.sync_word = 0x2B;
+    uint8_t h[kLoRaTapHeaderSize];
+    build_loratap_header(m, -92.0f, 6.5f, h);
+    CHECK(h[0] == 0 && h[2] == 0 && h[3] == 15);
+    CHECK(h[4] == 0x33 && h[5] == 0xD3 && h[6] == 0xE6 && h[7] == 0x08);  // 869525000 BE
+    CHECK(h[8] == 2 && h[9] == 11);
+    CHECK(h[10] == 47);   // -92 + 139
+    CHECK(h[13] == 26);   // 6.5 dB * 4
+    CHECK(h[14] == 0x2B);
+
+    const std::string path = "/tmp/lora_decoder_test.pcap";
+    PcapWriter w;
+    std::string err;
+    CHECK(w.open(path, err));
+    const uint8_t payload[] = {1, 2, 3, 4, 5};
+    CHECK(w.write(m, payload, sizeof(payload), -92.0f, 6.5f, std::chrono::system_clock::time_point(std::chrono::seconds(1700000000))));
+    w.close();
+    std::ifstream in(path, std::ios::binary);
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(bytes.size() == 24 + 16 + 15 + 5);
+    CHECK(bytes.size() >= 24 && bytes[0] == 0xd4 && bytes[1] == 0xc3 && bytes[20] == 0x0e && bytes[21] == 0x01);  // DLT 270
+    CHECK(bytes.size() >= 44 && bytes[32] == 20 && bytes[36] == 20);  // incl/orig len
+    std::remove(path.c_str());
+}
+
 int main() {
     test_aes();
     test_meshtastic_constants();
     test_meshtastic_roundtrip();
     test_lorawan();
     test_raw_text_and_plans();
+    test_more_meshtastic();
+    test_pcap();
     std::printf("%d/%d checks passed\n", g_checks - g_failures, g_checks);
     return g_failures == 0 ? 0 : 1;
 }

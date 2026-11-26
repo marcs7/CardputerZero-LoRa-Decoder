@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
+#include <filesystem>
 
 namespace viewmodel {
 namespace {
@@ -151,6 +153,7 @@ void BaseViewModel::apply_radio_mode() {
         case model::AppPage::Spectrum:
             spectrum_.live.clear();
             spectrum_.peak.clear();
+            spectrum_.history.clear();
             radio_->request_spectrum(current_spectrum_config());
             break;
         case model::AppPage::Hunt:
@@ -180,6 +183,12 @@ void BaseViewModel::poll_radio() {
     auto fresh = radio_->take_packets();
     if (!fresh.empty()) {
         for (auto& rec : fresh) {
+            if (pcap_.is_open() &&
+                !pcap_.write(rec.modem, rec.rx.data.data(), rec.rx.data.size(), rec.rx.rssi_dbm, rec.rx.snr_db,
+                             rec.time)) {
+                capture_error_ = "write failed: " + pcap_.path();
+                pcap_.close();
+            }
             packets_.push_front(std::move(rec));
             ++packets_total_;
         }
@@ -200,10 +209,15 @@ void BaseViewModel::poll_radio() {
         if (!same_layout) {
             spectrum_.peak = frame.dbm;
             spectrum_.sweeps = 0;
+            spectrum_.history.clear();
         } else {
             for (std::size_t i = 0; i < frame.dbm.size(); ++i) {
                 spectrum_.peak[i] = std::max(frame.dbm[i], spectrum_.peak[i] - kPeakDecayDb);
             }
+        }
+        spectrum_.history.push_front(frame.dbm);
+        while (spectrum_.history.size() > SpectrumView::kHistoryRows) {
+            spectrum_.history.pop_back();
         }
         spectrum_.live = std::move(frame.dbm);
         ++spectrum_.sweeps;
@@ -290,6 +304,9 @@ void BaseViewModel::settings_changed() {
 
 void BaseViewModel::apply_settings(const model::LoraSettings& settings) {
     model_.lora() = settings;
+    if (settings.capture && !pcap_.is_open() && !capture_directory_.empty()) {
+        start_capture();
+    }
     settings_version_subject_.set(settings_version_subject_.value() + 1);
     apply_radio_mode();
 }
@@ -399,6 +416,48 @@ void BaseViewModel::toggle_listen_iq() {
     m.iq_inverted = !m.iq_inverted;
     m.crc_on = !m.iq_inverted;  // LoRaWAN downlinks carry no payload CRC
     set_listen_modem(m);
+}
+
+void BaseViewModel::toggle_waterfall() {
+    model_.lora().waterfall = !model_.lora().waterfall;
+    settings_changed();
+}
+
+void BaseViewModel::set_capture_directory(std::string directory) {
+    capture_directory_ = std::move(directory);
+    if (model_.lora().capture && !pcap_.is_open()) {
+        start_capture();
+    }
+}
+
+void BaseViewModel::start_capture() {
+    capture_error_.clear();
+    if (capture_directory_.empty()) {
+        capture_error_ = "no capture directory";
+        return;
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(capture_directory_, ec);
+    const std::time_t now = std::time(nullptr);
+    std::tm tm{};
+    localtime_r(&now, &tm);
+    char name[48];
+    std::strftime(name, sizeof(name), "lora_%Y%m%d_%H%M%S.pcap", &tm);
+    const auto path = (std::filesystem::path(capture_directory_) / name).string();
+    if (!pcap_.open(path, capture_error_)) {
+        model_.lora().capture = false;
+    }
+}
+
+void BaseViewModel::toggle_capture() {
+    if (pcap_.is_open()) {
+        pcap_.close();
+        model_.lora().capture = false;
+    } else {
+        model_.lora().capture = true;
+        start_capture();
+    }
+    settings_changed();
 }
 
 } // namespace viewmodel

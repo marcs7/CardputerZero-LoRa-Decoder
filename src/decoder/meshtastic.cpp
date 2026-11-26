@@ -170,8 +170,17 @@ void decode_telemetry(const uint8_t* data, std::size_t size, DecodedPacket& out,
             }
         } else if (f.number == 4) {
             brief = "telemetry air";
-        } else if (f.number == 5) {
+        } else if (f.number == 5) {  // PowerMetrics
             brief = "telemetry power";
+            while (sub.next(m)) {
+                switch (m.number) {
+                    case 1: out.add("Ch1 voltage", fmt("%.2f V", m.as_float())); break;
+                    case 2: out.add("Ch1 current", fmt("%.1f mA", m.as_float())); break;
+                    case 3: out.add("Ch2 voltage", fmt("%.2f V", m.as_float())); break;
+                    case 4: out.add("Ch2 current", fmt("%.1f mA", m.as_float())); break;
+                    default: break;
+                }
+            }
         }
     }
 }
@@ -203,6 +212,101 @@ void decode_routing(const uint8_t* data, std::size_t size, DecodedPacket& out, s
             brief = f.varint == 0 ? "ack" : "nak err" + fmt_u(f.varint);
         }
     }
+}
+
+std::string fmt_latlon(int32_t lat_i, int32_t lon_i) {
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "%.5f,%.5f", lat_i * 1e-7, lon_i * 1e-7);
+    return buf;
+}
+
+void decode_waypoint(const uint8_t* data, std::size_t size, DecodedPacket& out, std::string& brief) {
+    ProtoReader reader(data, size);
+    ProtoField f;
+    int32_t lat = 0, lon = 0;
+    bool has_pos = false;
+    std::string name;
+    while (reader.next(f)) {
+        switch (f.number) {
+            case 1: out.add("Waypoint ID", fmt_u(f.varint)); break;
+            case 2: lat = f.as_sint32_fixed(); has_pos = true; break;
+            case 3: lon = f.as_sint32_fixed(); has_pos = true; break;
+            case 4: out.add("Expires", fmt_u(f.varint)); break;
+            case 6: if (f.type == WireType::LengthDelimited) { name = f.as_string(); out.add("Name", name); } break;
+            case 7: if (f.type == WireType::LengthDelimited) out.add("Description", f.as_string()); break;
+            default: break;
+        }
+    }
+    if (has_pos) out.add("Position", fmt_latlon(lat, lon));
+    brief = "waypoint " + (name.empty() ? std::string("?") : name);
+}
+
+void decode_neighbors(const uint8_t* data, std::size_t size, DecodedPacket& out, std::string& brief) {
+    ProtoReader reader(data, size);
+    ProtoField f;
+    int count = 0;
+    while (reader.next(f)) {
+        if (f.number == 1) {
+            out.add("Node", format_node_id(static_cast<uint32_t>(f.varint)));
+        } else if (f.number == 3) {
+            out.add("Interval", fmt_u(f.varint) + " s");
+        } else if (f.number == 4 && f.type == WireType::LengthDelimited) {
+            ProtoReader sub(f.data, f.size);
+            ProtoField n;
+            uint32_t id = 0;
+            float snr = 0;
+            while (sub.next(n)) {
+                if (n.number == 1) id = static_cast<uint32_t>(n.varint);
+                if (n.number == 2) snr = n.as_float();
+            }
+            out.add("Neighbor", format_node_id(id) + fmt("  SNR %.1f", snr));
+            ++count;
+        }
+    }
+    brief = "neighbors " + std::to_string(count);
+}
+
+void decode_map_report(const uint8_t* data, std::size_t size, DecodedPacket& out, std::string& brief) {
+    ProtoReader reader(data, size);
+    ProtoField f;
+    int32_t lat = 0, lon = 0;
+    bool has_pos = false;
+    std::string short_name;
+    while (reader.next(f)) {
+        const bool str = f.type == WireType::LengthDelimited;
+        switch (f.number) {
+            case 1: if (str) out.add("Long name", f.as_string()); break;
+            case 2: if (str) { short_name = f.as_string(); out.add("Short name", short_name); } break;
+            case 4: {
+                const char* hw = hw_model_name(f.varint);
+                out.add("HW model", hw ? hw : fmt_u(f.varint));
+                break;
+            }
+            case 5: if (str) out.add("Firmware", f.as_string()); break;
+            case 6: out.add("Region", fmt_u(f.varint)); break;
+            case 7: out.add("Modem preset", fmt_u(f.varint)); break;
+            case 9: lat = f.as_sint32_fixed(); has_pos = true; break;
+            case 10: lon = f.as_sint32_fixed(); has_pos = true; break;
+            case 13: out.add("Online nodes", fmt_u(f.varint)); break;
+            default: break;
+        }
+    }
+    if (has_pos) out.add("Position", fmt_latlon(lat, lon));
+    brief = "map report " + short_name;
+}
+
+void decode_paxcounter(const uint8_t* data, std::size_t size, DecodedPacket& out, std::string& brief) {
+    ProtoReader reader(data, size);
+    ProtoField f;
+    uint64_t wifi = 0, ble = 0;
+    while (reader.next(f)) {
+        if (f.number == 1) wifi = f.varint;
+        if (f.number == 2) ble = f.varint;
+        if (f.number == 3) out.add("Uptime", fmt_u(f.varint) + " s");
+    }
+    out.add("WiFi devices", fmt_u(wifi));
+    out.add("BLE devices", fmt_u(ble));
+    brief = "pax wifi " + fmt_u(wifi) + " ble " + fmt_u(ble);
 }
 
 // Decodes a meshtastic Data protobuf. Returns false if it doesn't look like one.
@@ -266,6 +370,16 @@ bool decode_data(const uint8_t* data, std::size_t size, DecodedPacket& out, std:
         case 5: decode_routing(payload, payload_size, out, brief); break;
         case 67: decode_telemetry(payload, payload_size, out, brief); break;
         case 70: decode_route(payload, payload_size, out, brief); break;
+        case 8: decode_waypoint(payload, payload_size, out, brief); break;
+        case 71: decode_neighbors(payload, payload_size, out, brief); break;
+        case 73: decode_map_report(payload, payload_size, out, brief); break;
+        case 34: decode_paxcounter(payload, payload_size, out, brief); break;
+        case 66: {  // RANGE_TEST: plain text "seq N"
+            std::string text(reinterpret_cast<const char*>(payload), payload_size);
+            out.add("Range test", text);
+            brief = "range test " + text;
+            break;
+        }
         default:
             out.add("Payload", to_hex(payload, payload_size));
             brief = port_name;
@@ -471,6 +585,7 @@ const std::vector<ModemPreset>& modem_presets() {
         {"ShortFast", 250000, 7, 5},
         {"ShortSlow", 250000, 8, 5},
         {"ShortTurbo", 500000, 7, 5},
+        {"LongTurbo", 500000, 11, 8},
     };
     return presets;
 }

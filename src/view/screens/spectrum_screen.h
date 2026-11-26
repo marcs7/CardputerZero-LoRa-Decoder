@@ -8,6 +8,8 @@
 
 #include "base_screen.h"
 
+#include <vector>
+
 namespace screen {
 
 // RSSI sweep across the selected band with peak hold and a tuning cursor.
@@ -20,6 +22,7 @@ private:
     void build_content(lv_obj_t* content) override;
     void refresh();
     void place_cursor();
+    void draw_waterfall();
     int cursor_index();
     static void refresh_cb(lv_observer_t* observer, lv_subject_t* subject);
 
@@ -32,6 +35,8 @@ private:
     lv_chart_series_t* live_series_{nullptr};
     lv_chart_series_t* peak_series_{nullptr};
     uint32_t cursor_hz_{0};
+    lv_obj_t* waterfall_{nullptr};
+    std::vector<uint8_t> waterfall_buf_;
 };
 
 } // namespace screen

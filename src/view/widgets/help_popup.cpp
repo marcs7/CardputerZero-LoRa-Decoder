@@ -30,7 +30,7 @@ constexpr PageHelp kPageHelp[model::kPageCount] = {
     {"SPECTRUM", {{{"LEFT / RIGHT", "Move cursor"},
                    {"UP / DOWN", "Zoom in / out at cursor"},
                    {"ENTER", "Listen at cursor freq"},
-                   {"P", "Reset peak hold"},
+                   {"P / W", "Reset peaks / waterfall"},
                    {"ESC, then LEFT/RIGHT", "Switch page (also 4..8, Tab)"},
                    {"HOLD ESC", "Exit"}}}},
     {"HUNT", {{{"LEFT / RIGHT", "Scan profile"},

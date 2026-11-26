@@ -6,18 +6,19 @@
 
   "store": {
     "summary": "Scan LoRa bands and decode Meshtastic and LoRaWAN packets with an SX1262 module",
-    "description": "Receive-only LoRa toolkit for an SX1262 radio wired to the CardputerZero SPI bus. Spectrum: RSSI sweep of the selected band with peak hold and a tuning cursor. Hunt: hops LoRaWAN channels and Meshtastic preset slots, uses Channel Activity Detection on every spreading factor and decodes whatever it catches. Listen: continuous receive with full control of frequency, SF, bandwidth, coding rate, sync word and IQ. Decoding: Meshtastic header plus AES-CTR decryption with the default key or your own channel PSKs (text, position, node info, telemetry, traceroute, routing), LoRaWAN MAC header (join requests, DevAddr, FCnt, FPort, NetID) and raw hex/ASCII for anything else. Band plans: EU868, US915, AU915, AS923, KR920, IN865, EU433. The radio never transmits.",
+    "description": "Receive-only LoRa toolkit for an SX1262 radio wired to the CardputerZero SPI bus. Spectrum: RSSI sweep of the selected band with peak hold or a scrolling waterfall, plus a tuning cursor. Hunt: hops LoRaWAN channels and Meshtastic preset slots, uses Channel Activity Detection on every spreading factor and decodes whatever it catches. Listen: continuous receive with full control of frequency, SF, bandwidth, coding rate, sync word and IQ. Decoding: Meshtastic header plus AES-CTR decryption with the default key or your own channel PSKs (text, position, node info, telemetry, traceroute, routing, waypoints, neighbor info, map reports, range test, paxcounter), LoRaWAN MAC header (join requests, DevAddr, FCnt, FPort, NetID) and raw hex/ASCII for anything else. Packet capture to PCAP (LoRaTAP, opens in Wireshark). Band plans: EU868, US915, AU915, AS923, KR920, IN865, EU433. The radio never transmits.",
     "categories": ["Radio & Comms", "Hardware & IoT"],
     "screenshots": [
       "screenshot/hunt.png",
       "screenshot/spectrum.png",
+      "screenshot/waterfall.png",
       "screenshot/packet-detail.png"
     ],
     "icon": "assets/store_icon.png",
     "license": "GPL-3.0-or-later",
     "source_repo": "https://github.com/marcs7/CardputerZero-LoRa-Decoder",
     "author": { "github": "marcs7", "display_name": "MarcS7 - IS0LTD" },
-    "share_code": "LORA",
+    "share_code": "LRDC",
     "permissions": {
       "camera": false,
       "microphone": false,
