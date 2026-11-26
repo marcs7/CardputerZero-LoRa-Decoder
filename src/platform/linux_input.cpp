@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 
 #if !USE_DESKTOP
 #include <cerrno>
@@ -46,6 +47,12 @@ GlobalKeyListener screen_key_listener = nullptr;
 void* screen_key_listener_user_data = nullptr;
 
 constexpr uint32_t kLongPressMs = 700;
+
+// LORA_KEY_DEBUG=1 prints raw evdev codes and routed keys to stderr.
+bool key_debug() {
+    static const bool enabled = std::getenv("LORA_KEY_DEBUG") != nullptr;
+    return enabled;
+}
 
 #if !USE_DESKTOP
 struct EvdevKeypad {
@@ -136,7 +143,24 @@ void ensure_long_press_timer() {
     }
 }
 
+// CardputerZero prints the arrows on F/Z/X/C (Fn layer). Inside the app the
+// bare keys act as arrows too, so Fn is not needed.
+uint32_t translate_arrow_alias(uint32_t key) {
+    switch (key) {
+        case 'f': case 'F': return LV_KEY_UP;
+        case 'z': case 'Z': return LV_KEY_LEFT;
+        case 'x': case 'X': return LV_KEY_DOWN;
+        case 'c': case 'C': return LV_KEY_RIGHT;
+        default: return key;
+    }
+}
+
 void route_key_state(uint32_t key, bool pressed) {
+    key = translate_arrow_alias(key);
+    if (key_debug()) {
+        std::fprintf(stderr, "[key] route key=%u pressed=%d last=%u last_pressed=%d\n", key, pressed,
+                     pressed_key, last_key_pressed);
+    }
     const bool new_hold = pressed && (!last_key_pressed || pressed_key != key);
     if (new_hold) {
         pressed_key = key;
@@ -272,6 +296,10 @@ void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         }
 
         const auto key = map_evdev_key(input.code);
+        if (key_debug()) {
+            std::fprintf(stderr, "[key] evdev fd=%d code=%u value=%d -> %u\n", keypad->fd, input.code,
+                         input.value, key);
+        }
         if (!key || input.value == 2) {
             continue;
         }

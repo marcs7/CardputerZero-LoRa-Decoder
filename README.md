@@ -90,12 +90,12 @@ radio is never put into TX.
 | Everywhere | `4`–`8` jump to a page · `ESC` then `←/→` move along the tab bar (`Enter`/`↓`/`ESC` back to the page) · `Tab` next page · hold `ESC` to exit · `Fn+H` help · `Fn+J` screenshot |
 | Scan | `←/→` move the cursor · `↑/↓` zoom · `Enter` listen at the cursor · `P` reset peaks |
 | Hunt | `←/→` change profile · `↑/↓` change band · `D` CAD or dwell mode · `Enter` open the log |
-| RX | `←/→` tune · `↑/↓` change SF · `B` bandwidth · `C` coding rate · `F` tuning step · `W` sync word · `I` invert IQ · `M` next Meshtastic preset |
-| Log | `↑/↓` select or scroll · `Enter` open or close the detail view · `L` listen on that packet's channel · `X` clear |
+| RX | `←/→` tune · `↑/↓` change SF · `B` bandwidth · `R` coding rate · `S` tuning step · `W` sync word · `I` invert IQ · `M` next Meshtastic preset |
+| Log | `↑/↓` select or scroll · `Enter` open or close the detail view · `L` listen on that packet's channel · `E` clear |
 | Cfg | `↑/↓` select a row · `←/→` change its value · `T` theme |
 
-On the CardputerZero keyboard the arrows are `Fn+F` (↑), `Fn+X` (↓), `Fn+Z` (←) and
-`Fn+C` (→).
+Arrows: inside the app the keys `F` (↑), `X` (↓), `Z` (←) and `C` (→) work as arrows
+without Fn, matching the arrows printed on the CardputerZero keyboard. `Fn+F/X/Z/C` works too.
 
 ## Configuration (`config/lora-decoder.conf`)
 
@@ -173,8 +173,3 @@ Third-party components:
 - Fonts in `assets/fonts`: see [`assets/fonts/LICENSE.txt`](assets/fonts/LICENSE.txt).
 - Protocol references: Meshtastic (packet format, default channel key), the LoRa Alliance
   LoRaWAN specification, and the Semtech SX1261/2 datasheet. No code was copied from them.
-
-## Before publishing
-
-Fill in the e-mail in `APP_MAINTAINER` (`cmake/cm0-package.cmake`). The store rejects packages that still contain the
-`TODO` placeholders.

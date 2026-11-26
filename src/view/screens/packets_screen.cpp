@@ -113,7 +113,7 @@ void PacketsScreen::refresh() {
     if (packets.empty()) {
         lv_label_set_text(header_label_, "No packets yet - start Hunt (5) or Listen (6)");
     } else {
-        lv_label_set_text_fmt(header_label_, "%u of %u   ENTER detail   L listen   X clear",
+        lv_label_set_text_fmt(header_label_, "%u of %u   ENTER detail   L listen   E clear",
                               static_cast<unsigned>(sel + 1), static_cast<unsigned>(packets.size()));
     }
 
@@ -211,8 +211,8 @@ bool PacketsScreen::handle_key(uint32_t key, bool long_pressed) {
         case LV_KEY_ENTER:
             open_detail();
             return true;
-        case 'x':
-        case 'X':
+        case 'e':
+        case 'E':
             vm.clear_packets();
             selected_seq_ = 0;
             top_ = 0;

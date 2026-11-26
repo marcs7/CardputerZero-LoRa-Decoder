@@ -141,8 +141,8 @@ bool ListenScreen::handle_key(uint32_t key, bool long_pressed) {
         case LV_KEY_UP: vm.cycle_listen_sf(+1); return true;
         case LV_KEY_DOWN: vm.cycle_listen_sf(-1); return true;
         case 'b': case 'B': vm.cycle_listen_bw(+1); return true;
-        case 'c': case 'C': vm.cycle_listen_cr(+1); return true;
-        case 'f': case 'F': vm.cycle_listen_step(+1); return true;
+        case 'r': case 'R': vm.cycle_listen_cr(+1); return true;
+        case 's': case 'S': vm.cycle_listen_step(+1); return true;
         case 'w': case 'W': vm.cycle_listen_sync(+1); return true;
         case 'i': case 'I': vm.toggle_listen_iq(); return true;
         case 'm': case 'M': next_preset(); return true;
