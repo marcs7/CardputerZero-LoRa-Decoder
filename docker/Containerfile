@@ -1,0 +1,9 @@
+# Dev/build image for loraDecoder: desktop simulator + aarch64 cross build.
+FROM docker.io/library/debian:trixie
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake ninja-build git pkg-config ca-certificates curl \
+      libsdl2-dev libfreetype-dev libpng-dev libjpeg-dev libfmt-dev zlib1g-dev \
+      gcc-aarch64-linux-gnu g++-aarch64-linux-gnu dpkg-dev file xvfb xdotool imagemagick xauth \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
