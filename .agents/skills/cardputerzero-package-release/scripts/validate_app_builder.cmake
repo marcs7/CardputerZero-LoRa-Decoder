@@ -90,10 +90,21 @@ json_get(manifest_package_name package_name)
 json_get(manifest_version version)
 json_get(manifest_icon store icon)
 
+# czdev publishes under the Debian package name (APP_DISPLAY_NAME lowercased),
+# so package_name may match either that or the CMake project name.
+set(debian_package_name "")
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../../../cmake/cm0-package.cmake")
+    file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../../cmake/cm0-package.cmake" package_cmake)
+    if(package_cmake MATCHES "set\\(APP_DISPLAY_NAME \"([^\"]+)\"")
+        string(TOLOWER "${CMAKE_MATCH_1}" debian_package_name)
+        string(REGEX REPLACE "[^a-z0-9+.-]" "-" debian_package_name "${debian_package_name}")
+    endif()
+endif()
 if(DEFINED cmake_project_name AND
-   NOT manifest_package_name STREQUAL cmake_project_name)
+   NOT manifest_package_name STREQUAL cmake_project_name AND
+   NOT manifest_package_name STREQUAL debian_package_name)
     add_validation_error(
-        "package_name '${manifest_package_name}' does not match CMake project '${cmake_project_name}'"
+        "package_name '${manifest_package_name}' matches neither CMake project '${cmake_project_name}' nor Debian package '${debian_package_name}'"
     )
 endif()
 
