@@ -75,7 +75,8 @@ bool parse_int(const std::string& value, int& out) {
 
 bool apply_key(ApplicationConfig& c, const std::string& section, const std::string& key,
                const std::string& raw_value) {
-    const std::string value = section == "meshtastic" ? trim(raw_value) : strip_comment(raw_value);
+    const std::string value = (section == "meshtastic" || section == "meshcore") ? trim(raw_value)
+                                                                                 : strip_comment(raw_value);
     auto& l = c.lora;
     auto& r = c.sx1262;
     if (section == "application") {
@@ -120,6 +121,13 @@ bool apply_key(ApplicationConfig& c, const std::string& section, const std::stri
         if (key == "antenna_switch_pin") return parse_int(value, r.antenna_switch_pin) && r.antenna_switch_pin <= 7;
         return true;
     }
+    if (section == "meshcore") {
+        decoder::meshcore::Channel ch;
+        ch.name = key;
+        if (!decoder::meshcore::parse_secret(value, ch.secret)) return false;
+        c.meshcore_channels.push_back(ch);
+        return true;
+    }
     if (section == "meshtastic") {
         std::vector<uint8_t> psk;
         if (!decoder::base64_decode(value, psk) || psk.empty() || psk.size() > 32) return false;
@@ -157,7 +165,7 @@ bool load_application_config(const std::string& path, ApplicationConfig& config,
         }
         // Meshtastic channel names are case sensitive.
         const auto raw_key = trim(line.substr(0, separator));
-        const auto key = section == "meshtastic" ? raw_key : lowercase(raw_key);
+        const auto key = (section == "meshtastic" || section == "meshcore") ? raw_key : lowercase(raw_key);
         if (!apply_key(config, section, key, line.substr(separator + 1))) {
             if (!error.empty()) error += "; ";
             error += "bad " + key + " at line " + std::to_string(line_number);

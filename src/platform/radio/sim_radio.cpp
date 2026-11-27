@@ -6,6 +6,7 @@
 
 #include "sim_radio.h"
 
+#include "meshcore.h"
 #include "meshtastic.h"
 
 #include <algorithm>
@@ -160,6 +161,27 @@ bool SimRadio::begin(std::string& error) {
                                      return meshtastic_frame(0x5e5e1234, 0xFFFFFFFF, 0xABC0 + *counter,
                                                              "LongFast", 1,
                                                              std::vector<uint8_t>(text.begin(), text.end()));
+                                 }});
+    }
+    // --- MeshCore EU Narrow (Sardinia): repeater adverts + Public channel chat ---
+    {
+        auto n = std::make_shared<uint32_t>(0);
+        const decoder::LoraModem mc = modem(869618000, 62500, 8, 8, decoder::meshcore::kSyncWord,
+                                            decoder::meshcore::preamble_for_sf(8));
+        transmitters_.push_back({mc, 12000, -96.0f, 4.5f, [n]() {
+                                     const uint32_t k = (*n)++;
+                                     const uint32_t ts = 1795700000U + k * 60U;
+                                     if (k % 3 == 0) {
+                                         uint8_t key[32];
+                                         for (int i = 0; i < 32; ++i) key[i] = static_cast<uint8_t>(0xC0 + i);
+                                         return decoder::meshcore::encode_advert(key, ts, 2, true, 39.2573, 9.1190,
+                                                                                 "CA1_repeater", 0);
+                                     }
+                                     const char* msgs[] = {"ciao dalla Sella del Diavolo", "qualcuno in ascolto a Quartu?",
+                                                           "test 73"};
+                                     return decoder::meshcore::encode_group_text(decoder::meshcore::public_channel(), ts,
+                                                                                 "IS0LTD", msgs[k % 3],
+                                                                                 static_cast<uint8_t>(1 + k % 2));
                                  }});
     }
     // --- LoRaWAN end devices (EU868) ---

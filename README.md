@@ -22,6 +22,13 @@ no libgpiod dependency.
   name, plus any channels you add in the config. Decoded port types: text, position, node info,
   telemetry (device, environment, power), traceroute, routing, waypoint, neighbor info, map report,
   range test and paxcounter. Other ports are shown as hex.
+- **MeshCore** (sync word 0x12): reads the packet header (route, payload type, transport codes,
+  path of repeater hashes with 1 to 3 byte hashes). Adverts show node type (companion, repeater,
+  room server, sensor), name and position; the signature is not verified. Group text on the
+  built-in **Public** channel and on your own channels (`[meshcore]` in the config) is verified
+  (HMAC-SHA256) and decrypted (AES-128). Direct messages, requests and paths stay encrypted
+  (end-to-end keys) and show source and destination hashes. ACK, trace (SNR per hop) and
+  multipart packets are recognised as well.
 - **LoRaWAN**: shows the MHDR type; for join requests, the JoinEUI, DevEUI and DevNonce; for
   data frames, the DevAddr with its NetID / NwkID (TTN is recognised), FCtrl flags, FCnt, FOpts,
   FPort and MIC. The FRMPayload stays encrypted because session keys are not available.
@@ -38,10 +45,11 @@ Scan profiles:
 
 | Profile | What it scans |
 | --- | --- |
-| All | Meshtastic presets and LoRaWAN uplinks |
+| All | Meshtastic presets, MeshCore presets and LoRaWAN uplinks |
 | LoRaWAN up | LoRaWAN uplinks |
 | LoRaWAN down | LoRaWAN downlinks (inverted IQ) |
 | Meshtastic | Meshtastic presets (sync word 0x2B) |
+| MeshCore | MeshCore presets: on EU868 **EU Narrow** 869.618 MHz SF8 62.5 kHz CR 4/8 (LoRaSardegna reference) and the legacy 869.525 MHz SF11 250 kHz |
 | Private 0x12 | LoRaWAN channels with the private sync word |
 
 ## Hardware: M5Stack Cap LoRa-1262
@@ -91,7 +99,7 @@ radio is never put into TX.
 | Everywhere | `4`–`8` jump to a page · `ESC` then `←/→` move along the tab bar (`Enter`/`↓`/`ESC` back to the page) · `Tab` next page · hold `ESC` to exit · `Fn+H` help · `Fn+J` screenshot |
 | Scan | `←/→` move the cursor · `↑/↓` zoom · `Enter` listen at the cursor · `P` reset peaks · `W` trace or waterfall |
 | Hunt | `←/→` change profile · `↑/↓` change band · `D` CAD or dwell mode · `Enter` open the log |
-| RX | `←/→` tune · `↑/↓` change SF · `B` bandwidth · `R` coding rate · `S` tuning step · `W` sync word · `I` invert IQ · `M` next Meshtastic preset |
+| RX | `←/→` tune · `↑/↓` change SF · `B` bandwidth · `R` coding rate · `S` tuning step · `W` sync word · `I` invert IQ · `M` next mesh preset (Meshtastic, then MeshCore) |
 | Log | `↑/↓` select or scroll · `Enter` open or close the detail view · `L` listen on that packet's channel · `E` clear |
 | Cfg | `↑/↓` select a row · `←/→` change its value · `T` theme |
 
@@ -161,7 +169,7 @@ src/view/screens      Spectrum / Hunt / Listen / Packets / Settings
   statistical: short, fast-SF packets can fall between hops. Use RX on a known channel when you
   need every packet.
 - LoRaWAN payloads and join-accepts stay encrypted.
-- Meshtastic packets on channels with unknown keys are shown as encrypted, with their header.
+- Meshtastic and MeshCore packets on channels with unknown keys are shown as encrypted, with their header.
 - Hardware support is limited to the SX1262. The Cap LoRa-1262 wiring comes from M5Stack's
   documentation; this build has not yet run on a physical CardputerZero.
 
@@ -181,5 +189,6 @@ Third-party components:
   [`LICENSES/MIT-M5Stack-Template.txt`](LICENSES/MIT-M5Stack-Template.txt).
 - [LVGL](https://lvgl.io) and [{fmt}](https://fmt.dev), both MIT, fetched at build time.
 - Fonts in `assets/fonts`: see [`assets/fonts/LICENSE.txt`](assets/fonts/LICENSE.txt).
-- Protocol references: Meshtastic (packet format, default channel key), the LoRa Alliance
-  LoRaWAN specification, and the Semtech SX1261/2 datasheet. No code was copied from them.
+- Protocol references: Meshtastic (packet format, default channel key), MeshCore
+  (`docs/packet_format.md`, `docs/payloads.md`, public channel key), the LoRa Alliance LoRaWAN
+  specification, and the Semtech SX1261/2 datasheet. No code was copied from them.

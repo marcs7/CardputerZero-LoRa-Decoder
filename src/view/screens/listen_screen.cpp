@@ -120,7 +120,9 @@ void ListenScreen::next_preset() {
     auto& vm = view_model();
     const auto* plan = decoder::find_band_plan(vm.settings().band);
     if (!plan) return;
-    const auto presets = decoder::build_scan_targets(*plan, decoder::ScanProfile::Meshtastic);
+    auto presets = decoder::build_scan_targets(*plan, decoder::ScanProfile::Meshtastic);
+    const auto mc = decoder::build_scan_targets(*plan, decoder::ScanProfile::MeshCore);
+    presets.insert(presets.end(), mc.begin(), mc.end());
     if (presets.empty()) return;
     preset_index_ = (preset_index_ + 1) % presets.size();
     vm.set_listen_modem(presets[preset_index_].modem);

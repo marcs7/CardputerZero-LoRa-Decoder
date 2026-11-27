@@ -13,6 +13,8 @@
 #include "meshtastic.h"
 #include "packet_decoder.h"
 #include "pcap_writer.h"
+#include "meshcore.h"
+#include "sha256.h"
 #include "protobuf_reader.h"
 
 #include <cstdio>
@@ -311,6 +313,108 @@ static void test_pcap() {
     std::remove(path.c_str());
 }
 
+static void test_crypto_primitives() {
+    uint8_t d[32];
+    sha256(reinterpret_cast<const uint8_t*>("abc"), 3, d);
+    CHECK(to_hex(d, 32, 0) == "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD");
+    sha256(nullptr, 0, d);
+    CHECK(to_hex(d, 32, 0) == "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855");
+    // RFC 4231 test case 2
+    const std::string key = "Jefe", msg = "what do ya want for nothing?";
+    hmac_sha256(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+                reinterpret_cast<const uint8_t*>(msg.data()), msg.size(), d);
+    CHECK(to_hex(d, 32, 0) == "5BDCC146BF60754E6A042426089575C75A003F089D2739839DEC58B964EC3843");
+    // AES-128 decrypt (FIPS-197 C.1 inverse)
+    const auto k = from_hex("000102030405060708090a0b0c0d0e0f");
+    const auto ct = from_hex("69c4e0d86a7b0430d8cdb78070b4c55a");
+    uint8_t pt[16];
+    CHECK(aes_ecb_decrypt(k.data(), 16, ct.data(), 16, pt));
+    CHECK(to_hex(pt, 16, 0) == "00112233445566778899AABBCCDDEEFF");
+    const auto k256 = from_hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
+    const auto ct256 = from_hex("8ea2b7ca516745bfeafc49904b496089");
+    CHECK(aes_ecb_decrypt(k256.data(), 32, ct256.data(), 16, pt));
+    CHECK(to_hex(pt, 16, 0) == "00112233445566778899AABBCCDDEEFF");
+}
+
+static void test_meshcore() {
+    using namespace decoder::meshcore;
+    CHECK(public_channel().hash() == 0x11);
+
+    // Reference GRP_TXT built with Python `cryptography` (independent implementation).
+    const auto grp = from_hex("15023a7f11c6704580faadde3bc6a4be0c78d48fdb6efce565f2155dca5db83b6fd4f4685175cb");
+    DecodeContext ctx;
+    ctx.sync_word = kSyncWord;
+    ctx.bandwidth_hz = 62500;
+    auto p = decode_packet(grp.data(), grp.size(), ctx);
+    CHECK(p.protocol == Protocol::MeshCore);
+    CHECK(field(p, "Channel") == "Public");
+    CHECK(field(p, "Sender") == "IS0LTD (unverified)");
+    CHECK(field(p, "Message") == "ciao Cagliari");
+    CHECK(field(p, "Path") == "3a>7f (2 hops)");
+    CHECK(p.summary == "#Public IS0LTD: ciao Cagliari h2");
+
+    // Same packet with a corrupted MAC: stays MeshCore but not decrypted.
+    auto bad = grp;
+    bad[5] ^= 0xFF;
+    p = decode_packet(bad.data(), bad.size(), ctx);
+    CHECK(p.protocol == Protocol::MeshCore);
+    CHECK(p.summary.find("GRP ch 11 enc") == 0);
+
+    // Reference advert: transport flood, 2-byte path hashes, repeater with location and name.
+    const auto adv = from_hex(
+        "103412000042aabbccdd000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2035086b"
+        "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+        "77777777777777777777777777777777777792d404570218258b004341315f7265706561746572");
+    Packet pk;
+    CHECK(parse(adv.data(), adv.size(), pk));
+    CHECK(pk.has_transport && pk.transport_codes[0] == 0x1234 && pk.path_hash_size == 2 && pk.path_hops == 2);
+    ctx.bandwidth_hz = 125000;  // strong proof needed off the narrow channel
+    p = decode_packet(adv.data(), adv.size(), ctx);
+    CHECK(p.protocol == Protocol::MeshCore);
+    CHECK(field(p, "Node type") == "repeater");
+    CHECK(field(p, "Name") == "CA1_repeater");
+    CHECK(field(p, "Position") == "39.25730,9.11900");
+    CHECK(field(p, "Path") == "aabb>ccdd (2 hops)");
+    CHECK(p.summary == "ADV repeater CA1_repeater h2");
+
+    // Encoder round trips (used by the simulator).
+    const auto enc = encode_group_text(public_channel(), 1795700000U, "Marco", "prova", 0);
+    p = decode_packet(enc.data(), enc.size(), ctx);
+    CHECK(field(p, "Message") == "prova");
+    uint8_t key[32] = {};
+    const auto adv2 = encode_advert(key, 1795700000U, 1, false, 0, 0, "IS0LTD-T", 1);
+    p = decode_packet(adv2.data(), adv2.size(), ctx);
+    CHECK(p.summary == "ADV companion IS0LTD-T h1");
+
+    // Custom channel secret from config text (hex and base64).
+    decoder::meshcore::Channel custom{"Sardegna", {}};
+    CHECK(parse_secret("00112233445566778899aabbccddeeff", custom.secret));
+    std::array<uint8_t, 16> b64{};
+    CHECK(parse_secret("izOH6cXN6mrJ5e26oRXNcg==", b64) && b64 == public_channel().secret);
+    std::vector<decoder::meshcore::Channel> channels = {custom};
+    const auto priv = encode_group_text(custom, 1795700000U, "IS0LTD", "canale privato", 0);
+    ctx.meshcore_channels = &channels;
+    p = decode_packet(priv.data(), priv.size(), ctx);
+    CHECK(field(p, "Channel") == "Sardegna");
+    ctx.meshcore_channels = nullptr;
+
+    // ASCII sensor on the same private sync word must not look like MeshCore.
+    const std::string t = "T=21.5C H=48%";
+    p = decode_packet(reinterpret_cast<const uint8_t*>(t.data()), t.size(), ctx);
+    CHECK(p.protocol == Protocol::Raw);
+
+    // Scan targets for Sardinia
+    const auto* eu = find_band_plan("EU868");
+    const auto mc = build_scan_targets(*eu, ScanProfile::MeshCore);
+    CHECK(mc.size() == 2);
+    CHECK(mc[0].label == "MC EU Narrow" && mc[0].modem.freq_hz == 869618000 && mc[0].modem.bandwidth_hz == 62500 &&
+          mc[0].modem.spreading_factor == 8 && mc[0].modem.coding_rate == 8 && mc[0].modem.sync_word == 0x12 &&
+          mc[0].modem.preamble == 32);
+    bool all_has_mc = false;
+    for (const auto& tg : build_scan_targets(*eu, ScanProfile::All)) all_has_mc |= tg.label == "MC EU Narrow";
+    CHECK(all_has_mc);
+}
+
 int main() {
     test_aes();
     test_meshtastic_constants();
@@ -319,6 +423,8 @@ int main() {
     test_raw_text_and_plans();
     test_more_meshtastic();
     test_pcap();
+    test_crypto_primitives();
+    test_meshcore();
     std::printf("%d/%d checks passed\n", g_checks - g_failures, g_checks);
     return g_failures == 0 ? 0 : 1;
 }

@@ -6,6 +6,7 @@
 
 #include "frequency_plan.h"
 
+#include "meshcore.h"
 #include "meshtastic.h"
 
 #include <algorithm>
@@ -39,6 +40,7 @@ const char* scan_profile_name(ScanProfile profile) {
         case ScanProfile::LoRaWANDownlink: return "LoRaWAN down";
         case ScanProfile::Meshtastic: return "Meshtastic";
         case ScanProfile::Private: return "Private 0x12";
+        case ScanProfile::MeshCore: return "MeshCore";
         default: return "?";
     }
 }
@@ -141,9 +143,27 @@ std::vector<ScanTarget> build_scan_targets(const BandPlan& plan, ScanProfile pro
         }
     };
 
+    const auto add_meshcore = [&]() {
+        for (const auto& preset : meshcore::presets_for_plan(plan.name)) {
+            ScanTarget t;
+            t.modem.freq_hz = preset.freq_hz;
+            t.modem.bandwidth_hz = preset.bandwidth_hz;
+            t.modem.spreading_factor = preset.spreading_factor;
+            t.modem.coding_rate = preset.coding_rate;
+            t.modem.sync_word = meshcore::kSyncWord;
+            t.modem.preamble = meshcore::preamble_for_sf(preset.spreading_factor);
+            t.modem.iq_inverted = false;
+            t.modem.crc_on = true;
+            t.sf_mask = static_cast<uint16_t>(1U << preset.spreading_factor);
+            t.label = std::string("MC ") + preset.name;
+            targets.push_back(std::move(t));
+        }
+    };
+
     switch (profile) {
         case ScanProfile::All:
             add_meshtastic();
+            add_meshcore();
             add_lorawan(plan.uplinks, kSyncLoRaWANPublic, false, "LW");
             break;
         case ScanProfile::LoRaWAN:
@@ -157,6 +177,9 @@ std::vector<ScanTarget> build_scan_targets(const BandPlan& plan, ScanProfile pro
             break;
         case ScanProfile::Private:
             add_lorawan(plan.uplinks, kSyncPrivate, false, "PRV");
+            break;
+        case ScanProfile::MeshCore:
+            add_meshcore();
             break;
         default:
             break;

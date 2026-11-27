@@ -43,6 +43,7 @@ std::unique_ptr<Radio> make_radio_from_backend(const std::string& backend, const
 
 RadioService::RadioService(std::unique_ptr<Radio> radio) : radio_(std::move(radio)) {
     keys_ = decoder::meshtastic::default_channel_keys();
+    meshcore_channels_ = decoder::meshcore::default_channels();
     status_.backend = radio_ ? radio_->name() : "none";
     status_.simulated = radio_ && radio_->simulated();
 }
@@ -127,6 +128,11 @@ void RadioService::request_listen(const decoder::LoraModem& modem) {
 void RadioService::set_meshtastic_keys(std::vector<decoder::meshtastic::ChannelKey> keys) {
     std::lock_guard<std::mutex> lock(mutex_);
     keys_ = std::move(keys);
+}
+
+void RadioService::set_meshcore_channels(std::vector<decoder::meshcore::Channel> channels) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    meshcore_channels_ = std::move(channels);
 }
 
 std::vector<PacketRecord> RadioService::take_packets() {
@@ -400,9 +406,11 @@ void RadioService::run_listen_step(const decoder::LoraModem& modem, bool& config
 
 void RadioService::publish_packet(RxPacket&& rx, const decoder::LoraModem& modem, const std::string& source) {
     std::vector<decoder::meshtastic::ChannelKey> keys;
+    std::vector<decoder::meshcore::Channel> mc_channels;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         keys = keys_;
+        mc_channels = meshcore_channels_;
     }
     PacketRecord rec;
     rec.time = std::chrono::system_clock::now();
@@ -411,7 +419,9 @@ void RadioService::publish_packet(RxPacket&& rx, const decoder::LoraModem& modem
     decoder::DecodeContext ctx;
     ctx.sync_word = modem.sync_word;
     ctx.iq_inverted = modem.iq_inverted;
+    ctx.bandwidth_hz = modem.bandwidth_hz;
     ctx.meshtastic_keys = &keys;
+    ctx.meshcore_channels = &mc_channels;
     rec.decoded = decoder::decode_packet(rx.data.data(), rx.data.size(), ctx);
     if (rx.crc_error) {
         rec.decoded.summary = "[CRC] " + rec.decoded.summary;

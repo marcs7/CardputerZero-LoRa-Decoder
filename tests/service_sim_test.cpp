@@ -68,6 +68,10 @@ int main(int argc, char** argv) {
     decoder::LoraModem prv = lw;  // private sensor 868.3 SF9 sync 0x12
     prv.freq_hz = 868300000; prv.spreading_factor = 9; prv.sync_word = 0x12;
     listen_for(prv, "prv", 15);
+    decoder::LoraModem mcm;  // MeshCore EU Narrow (Sardinia)
+    mcm.freq_hz = 869618000; mcm.bandwidth_hz = 62500; mcm.spreading_factor = 8; mcm.coding_rate = 8;
+    mcm.sync_word = 0x12; mcm.preamble = 32;
+    listen_for(mcm, "mc", 30);
 
     service.request_spectrum({863000000, 870000000, 50000, 125000});
     SpectrumFrame frame;
@@ -81,7 +85,7 @@ int main(int argc, char** argv) {
 
     for (auto& [k, v] : by_proto) std::printf("%s: %d\n", k.c_str(), v);
     const bool ok = got && hunt_packets > 0 && by_proto["mt-Meshtastic"] > 0 && by_proto["lw-LoRaWAN"] > 0 &&
-                    by_proto["prv-Raw"] > 0;
+                    by_proto["prv-Raw"] > 0 && by_proto["mc-MeshCore"] > 0;
     std::printf(ok ? "OK\n" : "FAILED\n");
     return ok ? 0 : 1;
 }

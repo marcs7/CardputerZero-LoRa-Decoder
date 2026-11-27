@@ -14,6 +14,7 @@
 
 #include "decoded_packet.h"
 #include "frequency_plan.h"
+#include "meshcore.h"
 #include "meshtastic.h"
 #include "radio.h"
 
@@ -99,6 +100,7 @@ public:
     void request_hunt(std::vector<decoder::ScanTarget> targets, HuntOptions options);
     void request_listen(const decoder::LoraModem& modem);
     void set_meshtastic_keys(std::vector<decoder::meshtastic::ChannelKey> keys);
+    void set_meshcore_channels(std::vector<decoder::meshcore::Channel> channels);
 
     // LVGL thread side
     std::vector<PacketRecord> take_packets();
@@ -135,6 +137,7 @@ private:
     Command pending_;
     std::atomic<bool> pending_flag_{false};
     std::vector<decoder::meshtastic::ChannelKey> keys_;
+    std::vector<decoder::meshcore::Channel> meshcore_channels_;
     std::vector<PacketRecord> packets_;
     SpectrumFrame spectrum_;
     bool spectrum_fresh_{false};

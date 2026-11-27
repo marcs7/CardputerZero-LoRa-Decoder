@@ -34,7 +34,9 @@ void decode_raw(const uint8_t* data, std::size_t size, DecodedPacket& out) {
 DecodedPacket decode_packet(const uint8_t* data, std::size_t size, const DecodeContext& context) {
     DecodedPacket out;
     static const std::vector<meshtastic::ChannelKey> kDefaultKeys = meshtastic::default_channel_keys();
+    static const std::vector<meshcore::Channel> kDefaultChannels = meshcore::default_channels();
     const auto& keys = context.meshtastic_keys ? *context.meshtastic_keys : kDefaultKeys;
+    const auto& mc_channels = context.meshcore_channels ? *context.meshcore_channels : kDefaultChannels;
 
     if (size == 0) {
         out.summary = "(empty)";
@@ -52,8 +54,17 @@ DecodedPacket decode_packet(const uint8_t* data, std::size_t size, const DecodeC
         }
         out = DecodedPacket{};
     } else {
-        // Unknown network: accept Meshtastic only if a key actually decrypts it,
-        // then fall back to a structural LoRaWAN match.
+        // Private sync word (0x12 is shared by MeshCore and private LoRaWAN/LoRa
+        // networks). Prefer proofs (decryption, well-formed advert), then structure.
+        DecodedPacket mc;
+        const auto mc_conf = meshcore::decode(data, size, mc_channels, mc);
+        if (mc_conf == meshcore::Confidence::Strong) {
+            return mc;
+        }
+        // LoRaWAN never uses 62.5 kHz: on narrow MeshCore channels trust the structure.
+        if (mc_conf == meshcore::Confidence::Structural && context.bandwidth_hz == 62500) {
+            return mc;
+        }
         bool decrypted = false;
         DecodedPacket attempt;
         if (meshtastic::decode(data, size, keys, attempt, &decrypted) && decrypted) {
@@ -64,6 +75,10 @@ DecodedPacket decode_packet(const uint8_t* data, std::size_t size, const DecodeC
             return out;
         }
         out = DecodedPacket{};
+        if (mc_conf == meshcore::Confidence::Structural) {
+            mc.add("Note", "MeshCore structure (not proven)");
+            return mc;
+        }
     }
 
     decode_raw(data, size, out);

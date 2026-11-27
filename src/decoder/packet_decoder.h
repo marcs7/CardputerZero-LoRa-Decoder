@@ -10,6 +10,7 @@
 #pragma once
 
 #include "decoded_packet.h"
+#include "meshcore.h"
 #include "meshtastic.h"
 
 #include <cstdint>
@@ -20,7 +21,9 @@ namespace decoder {
 struct DecodeContext {
     uint8_t sync_word{0x34};
     bool iq_inverted{false};
+    uint32_t bandwidth_hz{0};
     const std::vector<meshtastic::ChannelKey>* meshtastic_keys{nullptr};
+    const std::vector<meshcore::Channel>* meshcore_channels{nullptr};
 };
 
 DecodedPacket decode_packet(const uint8_t* data, std::size_t size, const DecodeContext& context);

@@ -38,11 +38,12 @@ struct ScanTarget {
 };
 
 enum class ScanProfile : uint8_t {
-    All = 0,           // LoRaWAN uplinks + Meshtastic presets
+    All = 0,           // Meshtastic + MeshCore presets + LoRaWAN uplinks
     LoRaWAN,           // LoRaWAN uplink channels, public sync word
     LoRaWANDownlink,   // RX1/RX2 downlinks (inverted IQ)
     Meshtastic,        // Meshtastic preset slots (sync 0x2B)
     Private,           // LoRaWAN channels with private sync word 0x12
+    MeshCore,          // MeshCore presets of the band (sync 0x12)
     Count,
 };
 

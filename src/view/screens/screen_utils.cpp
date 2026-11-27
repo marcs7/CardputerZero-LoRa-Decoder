@@ -29,6 +29,10 @@ lv_obj_t* label(lv_obj_t* parent, const lv_font_t* font, int32_t x, int32_t y, i
     lv_obj_set_style_text_font(l, font, 0);
     lv_label_set_long_mode(l, mode);
     lv_obj_set_width(l, w);
+    // Single-line modes need a fixed height, otherwise LVGL wraps before truncating.
+    if (mode == LV_LABEL_LONG_DOT || mode == LV_LABEL_LONG_CLIP) {
+        lv_obj_set_height(l, lv_font_get_line_height(font));
+    }
     lv_obj_set_pos(l, x, y);
     lv_label_set_text(l, "");
     return l;
@@ -69,6 +73,7 @@ const char* protocol_tag(decoder::Protocol protocol) {
     switch (protocol) {
         case decoder::Protocol::Meshtastic: return "MT";
         case decoder::Protocol::LoRaWAN: return "LW";
+        case decoder::Protocol::MeshCore: return "MC";
         default: return "RAW";
     }
 }
@@ -77,6 +82,7 @@ lv_color_t protocol_color(decoder::Protocol protocol, const view::ThemePalette& 
     switch (protocol) {
         case decoder::Protocol::Meshtastic: return colors.success;
         case decoder::Protocol::LoRaWAN: return colors.info;
+        case decoder::Protocol::MeshCore: return colors.primary;
         default: return colors.warning;
     }
 }

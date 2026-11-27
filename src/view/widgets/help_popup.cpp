@@ -43,7 +43,7 @@ constexpr PageHelp kPageHelp[model::kPageCount] = {
                  {"UP / DOWN", "Spreading factor"},
                  {"B / R / S", "Bandwidth / CR / step"},
                  {"W / I", "Sync word / invert IQ"},
-                 {"M", "Next Meshtastic preset"},
+                 {"M", "Next mesh preset (MT / MeshCore)"},
                  {"ESC, then LEFT/RIGHT", "Switch page"}}}},
     {"PACKETS", {{{"UP / DOWN", "Select / scroll"},
                   {"ENTER", "Open / close detail"},

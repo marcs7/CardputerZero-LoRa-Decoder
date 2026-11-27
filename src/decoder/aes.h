@@ -21,6 +21,7 @@ public:
     // key_len must be 16 (AES-128) or 32 (AES-256). Returns false otherwise.
     bool set_key(const uint8_t* key, std::size_t key_len);
     void encrypt_block(const uint8_t in[16], uint8_t out[16]) const;
+    void decrypt_block(const uint8_t in[16], uint8_t out[16]) const;
 
 private:
     std::array<uint8_t, 240> round_keys_{};
@@ -36,5 +37,9 @@ bool aes_ctr_xcrypt(const uint8_t* key,
                     const uint8_t* in,
                     std::size_t len,
                     uint8_t* out);
+
+// AES-ECB over whole 16-byte blocks (len must be a multiple of 16). Used by MeshCore.
+bool aes_ecb_encrypt(const uint8_t* key, std::size_t key_len, const uint8_t* in, std::size_t len, uint8_t* out);
+bool aes_ecb_decrypt(const uint8_t* key, std::size_t key_len, const uint8_t* in, std::size_t len, uint8_t* out);
 
 } // namespace decoder

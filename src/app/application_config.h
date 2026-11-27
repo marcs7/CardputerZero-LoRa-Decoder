@@ -8,6 +8,7 @@
 #pragma once
 
 #include "lora_settings.h"
+#include "meshcore.h"
 #include "meshtastic.h"
 #include "radio/sx1262.h"
 
@@ -24,6 +25,8 @@ struct ApplicationConfig {
     platform::radio::Sx1262Config sx1262;
     // [meshtastic]  name = base64 PSK (in addition to the default key)
     std::vector<decoder::meshtastic::ChannelKey> meshtastic_channels;
+    // [meshcore]  name = 16-byte secret (base64 or 32 hex digits), besides "Public"
+    std::vector<decoder::meshcore::Channel> meshcore_channels;
 };
 
 // Unknown keys are ignored; malformed values are reported but parsing goes on

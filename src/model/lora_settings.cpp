@@ -40,6 +40,7 @@ const char* profile_key(decoder::ScanProfile profile) {
         case decoder::ScanProfile::LoRaWANDownlink: return "lorawan_down";
         case decoder::ScanProfile::Meshtastic: return "meshtastic";
         case decoder::ScanProfile::Private: return "private";
+        case decoder::ScanProfile::MeshCore: return "meshcore";
         default: return "all";
     }
 }

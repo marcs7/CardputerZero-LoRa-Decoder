@@ -353,6 +353,9 @@ int Application::run() {
     auto keys = decoder::meshtastic::default_channel_keys();
     keys.insert(keys.end(), config.meshtastic_channels.begin(), config.meshtastic_channels.end());
     radio.set_meshtastic_keys(std::move(keys));
+    auto mc_channels = decoder::meshcore::default_channels();
+    mc_channels.insert(mc_channels.end(), config.meshcore_channels.begin(), config.meshcore_channels.end());
+    radio.set_meshcore_channels(std::move(mc_channels));
     std::string radio_error;
     if (radio.start(radio_error)) {
         LOG_INFO("radio backend '{}' ready", backend);

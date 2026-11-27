@@ -16,6 +16,7 @@ enum class Protocol : uint8_t {
     Raw = 0,
     LoRaWAN,
     Meshtastic,
+    MeshCore,
 };
 
 const char* protocol_name(Protocol protocol);

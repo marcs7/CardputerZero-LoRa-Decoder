@@ -16,6 +16,8 @@ const char* protocol_name(Protocol protocol) {
             return "LoRaWAN";
         case Protocol::Meshtastic:
             return "Meshtastic";
+        case Protocol::MeshCore:
+            return "MeshCore";
         case Protocol::Raw:
         default:
             return "Raw";
