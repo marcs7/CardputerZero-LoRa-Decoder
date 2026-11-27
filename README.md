@@ -139,7 +139,7 @@ czb ctest --test-dir build/linux-x86-64 -C Debug --output-on-failure
 ./build/linux-x86-64/Debug/lora_decoder            # needs a host with SDL2
 
 # Device: cross-compile and package (downloads the CM0 BSP sysroot)
-czb cmake --workflow --preset cp0-cross-package    # -> dist/LoRaDecoder_<ver>_rev1_arm64.deb
+czb cmake --workflow --preset cp0-cross-package    # -> dist/LoRaDecoder_<ver>_arm64.deb
 ```
 
 Install the package on the device with `sudo dpkg -i LoRaDecoder_*.deb`, or use `./deploy.sh`.
