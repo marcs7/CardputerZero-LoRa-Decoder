@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "description": "LoRa frequency scanner and packet decoder for CardputerZero (SX1262)",
   "store": {
-    "summary": "Scan LoRa bands and decode Meshtastic, MeshCore and LoRaWAN packets with the Cap LoRa-1262",
+    "summary": "Scan LoRa bands, decode Meshtastic, MeshCore and LoRaWAN packets (Cap LoRa-1262)",
     "description": "Receive-only LoRa toolkit for an SX1262 radio wired to the CardputerZero SPI bus. Spectrum: RSSI sweep of the selected band with peak hold or a scrolling waterfall, plus a tuning cursor. Hunt: hops LoRaWAN channels and Meshtastic preset slots, uses Channel Activity Detection on every spreading factor and decodes whatever it catches. Listen: continuous receive with full control of frequency, SF, bandwidth, coding rate, sync word and IQ. Decoding: Meshtastic header plus AES-CTR decryption with the default key or your own channel PSKs (text, position, node info, telemetry, traceroute, routing, waypoints, neighbor info, map reports, range test, paxcounter), LoRaWAN MAC header (join requests, DevAddr, FCnt, FPort, NetID) and raw hex/ASCII for anything else. Packet capture to PCAP (LoRaTAP, opens in Wireshark). MeshCore: adverts (node type, name, position), path/hops and Public or custom channel messages decrypted (EU Narrow 869.618 MHz preset used in Sardinia and Europe). Band plans: EU868, US915, AU915, AS923, KR920, IN865, EU433. The radio never transmits.",
     "categories": [
       "Radio & Comms",
@@ -37,7 +37,7 @@
     "locales": {
       "it": {
         "title": "LoRa Decoder",
-        "summary": "Scansiona le bande LoRa e decodifica pacchetti Meshtastic, MeshCore e LoRaWAN con il Cap LoRa-1262",
+        "summary": "Scansiona le bande LoRa e decodifica Meshtastic, MeshCore e LoRaWAN",
         "description": "Strumento LoRa di sola ricezione per il Cap LoRa-1262 (SX1262) sul CardputerZero. Spettro: sweep RSSI della banda con picco o waterfall e cursore di sintonia. Hunt: scorre i canali LoRaWAN e i preset Meshtastic, usa il Channel Activity Detection su ogni spreading factor e decodifica ciò che riceve. Ascolto: ricezione continua con frequenza, SF, banda, coding rate, sync word e IQ regolabili. Decodifica Meshtastic con decifratura AES-CTR (chiave di default o PSK personali): testo, posizione, info nodo, telemetria, traceroute, waypoint, vicini, map report. LoRaWAN: tipo messaggio, DevAddr/NetID, FCnt, FPort, join request. MeshCore: advert (tipo nodo, nome, posizione), percorso tra i repeater e messaggi del canale Public o di canali tuoi decifrati (preset EU Narrow 869.618 MHz usato in Sardegna). Cattura PCAP (LoRaTAP, si apre in Wireshark). Piani: EU868, US915, AU915, AS923, KR920, IN865, EU433. La radio non trasmette mai."
       },
       "zh-CN": {
@@ -50,11 +50,11 @@
       },
       "es": {
         "title": "LoRa Decoder",
-        "summary": "Escanea bandas LoRa y decodifica paquetes Meshtastic, MeshCore y LoRaWAN con el Cap LoRa-1262 (solo recepción)"
+        "summary": "Escanea bandas LoRa y decodifica Meshtastic, MeshCore y LoRaWAN"
       },
       "de": {
         "title": "LoRa Decoder",
-        "summary": "LoRa-Bänder scannen und Meshtastic-, MeshCore- und LoRaWAN-Pakete mit dem Cap LoRa-1262 dekodieren (nur Empfang)"
+        "summary": "LoRa-Bänder scannen, Meshtastic-, MeshCore- und LoRaWAN-Pakete dekodieren"
       }
     }
   }
