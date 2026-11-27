@@ -27,9 +27,8 @@ void ListenScreen::build_content(lv_obj_t* content) {
     const auto* tiny = ui::font(assets(), 10);
 
     freq_label_ = ui::label(content, big, 6, 0, 200);
-    step_label_ = ui::label(content, small, 200, 4, 114);
+    step_label_ = ui::label(content, small, 170, 4, 144, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(step_label_, LV_TEXT_ALIGN_RIGHT, 0);
-    reactive::bind_theme(step_label_, vm.dark_mode_subject(), reactive::ThemeRole::Text);
 
     modem_label_ = ui::label(content, small, 6, 22, 308);
     reactive::bind_theme(modem_label_, vm.dark_mode_subject(), reactive::ThemeRole::Text);
@@ -70,7 +69,23 @@ void ListenScreen::refresh() {
 
     lv_label_set_text_fmt(freq_label_, "%s MHz", decoder::format_mhz(s.listen.freq_hz).c_str());
     lv_obj_set_style_text_color(freq_label_, colors.primary, 0);
-    lv_label_set_text_fmt(step_label_, "step %s", decoder::format_bw(s.listen_step_hz).c_str());
+    // Name the mesh preset the radio is on (Meshtastic / MeshCore), or "custom".
+    std::string preset = "custom";
+    if (const auto* plan = decoder::find_band_plan(s.band)) {
+        auto targets = decoder::build_scan_targets(*plan, decoder::ScanProfile::Meshtastic);
+        const auto mc = decoder::build_scan_targets(*plan, decoder::ScanProfile::MeshCore);
+        targets.insert(targets.end(), mc.begin(), mc.end());
+        for (const auto& t : targets) {
+            const auto& m = t.modem;
+            if (m.freq_hz == s.listen.freq_hz && m.bandwidth_hz == s.listen.bandwidth_hz &&
+                m.spreading_factor == s.listen.spreading_factor && m.sync_word == s.listen.sync_word) {
+                preset = t.label;
+                break;
+            }
+        }
+    }
+    lv_label_set_text(step_label_, preset.c_str());
+    lv_obj_set_style_text_color(step_label_, preset == "custom" ? colors.text : colors.primary, 0);
     lv_label_set_text(modem_label_, ui::modem_long(s.listen).c_str());
 
     const bool listening = st.mode == platform::radio::ServiceMode::Listen && st.error.empty();
@@ -90,7 +105,8 @@ void ListenScreen::refresh() {
         lv_obj_set_style_text_color(info_label_, colors.error, 0);
     } else {
         const double toa = decoder::time_on_air_ms(s.listen, 32);
-        lv_label_set_text_fmt(info_label_, "preamble %u  CRC %s  ToA(32B) %.0f ms  packets %u", s.listen.preamble,
+        lv_label_set_text_fmt(info_label_, "step %s  preamble %u  CRC %s  ToA(32B) %.0f ms  pkts %u",
+                              decoder::format_bw(s.listen_step_hz).c_str(), s.listen.preamble,
                               s.listen.crc_on ? "on" : "off", toa, st.packets);
         lv_obj_set_style_text_color(info_label_, colors.text, 0);
         lv_obj_set_style_text_opa(info_label_, LV_OPA_70, 0);
